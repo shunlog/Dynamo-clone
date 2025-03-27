@@ -27,7 +27,7 @@ gossip_node(Nodes, Timeout) ->
         {From, info} -> From ! Nodes,
                         gossip_node(Nodes, Timeout);
         {join, NewPid} -> gossip_node(sets:add_element(NewPid, Nodes), Timeout);
-        {members, SenderNodes} -> 
+        {gossip, SenderNodes} -> 
             Diff = sets:subtract(SenderNodes, Nodes),
             DiffSize = sets:size(Diff),
             if
@@ -35,8 +35,10 @@ gossip_node(Nodes, Timeout) ->
                     io:format("~p found ~p~n", [self(), Diff]);
                 true -> ok
             end,
+            timer:sleep(1000),                  % gossip after receive, but not immediately
             node_send(sets:union(Nodes, SenderNodes), Timeout)
     after Timeout ->
+            %% gossip after timeout
             node_send(Nodes, Timeout)
     end.
 
@@ -48,7 +50,7 @@ node_send(Nodes, Timeout) ->
         Size =/= 0 ->
             Pid = random_element(sets:to_list(Others)),
             
-            Pid ! {members, Nodes};
+            Pid ! {gossip, Nodes};
         true ->ok
     end,
     gossip_node(Nodes, Timeout).
@@ -56,7 +58,7 @@ node_send(Nodes, Timeout) ->
 
 
 main() ->
-    Seed = spawn(main, gossip_node, [3000]),
+    Seed = spawn(main, gossip_node, [1000]),
     NodesCount = 10,
     SpawnNode = fun(_) -> Node = spawn(main, gossip_node, [1000]),
                           Node ! {join, Seed}
